@@ -9,6 +9,7 @@ env:
 jobs:
   build-image:
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out build configurations
         uses: actions/checkout@v4
@@ -16,7 +17,7 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-user-static jq
+          sudo apt-get install -y qemu-user-static jq git
           sudo systemctl restart systemd-binfmt.service || true
 
       - name: Substitute placeholders in configs
@@ -29,54 +30,54 @@ jobs:
           git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
-          # Добавляем путь в PATH, чтобы команда была доступна далее
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Set up pmaports
         run: |
           mkdir -p ~/.config
           cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-          
-          # Инициализация (использует конфиг)
-          pmbootstrap init || true
-          
+
+          # Полностью неинтерактивная инициализация
+          pmbootstrap init --no-interactive
+
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          # ИСПРАВЛЕНО: Укажите ваш репозиторий pmaports
-          git remote add sm7125 github.com
+          git remote add sm7125 https://github.com/staricashka6X/pmaports-sm7125.git
           git fetch sm7125
           git reset --hard sm7125/main
+
           pmbootstrap index
 
       - name: Clone kernel sources
         run: |
-          # ИСПРАВЛЕНО: Укажите полный URL вашего ядра
-          git clone github.com --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
+          git clone --depth 1 --branch $KERNEL_BRANCH https://github.com/staricashka6X/kernel_xiaomi_sm7125.git linux
 
       - name: Compile kernel
         run: |
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
-          # Убедитесь, что эти файлы конфигурации существуют в вашем ядре
+
+          # Конфиги должны существовать в репозитории ядра
           make defconfig sm7125.config
           make -j$(nproc)
+
           pmbootstrap build --envkernel linux-postmarketos-qcom-sm7125
 
       - name: Build Joyeuse Image
         run: |
           mkdir out
-          # Сборка
+
+          # Tianma
           pmbootstrap install --password 670276 --no-fpart
-          
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-tianma-joyeuse.img
           cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-joyeuse.img
-          
-          # Смена панели/ядра на huaxing
+
+          # Huaxing
           sed -i 's/kernel = joyeuse_tianma/kernel = joyeuse_huaxing/' ~/.config/pmbootstrap_v3.cfg
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-huaxing-joyeuse.img
-          
+
           xz -T0 -v out/rootfs-joyeuse.img
 
       - name: Upload
