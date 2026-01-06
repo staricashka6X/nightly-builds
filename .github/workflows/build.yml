@@ -18,21 +18,27 @@ jobs:
         run: |
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
 
-      - name: Install pmbootstrap from git
+      - name: Install pmbootstrap v3.15.0
         run: |
-          git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          git clone --depth=1 --branch v3.15.0 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           pmbootstrap --version
 
-      - name: Set up pmaports
+      - name: Initialize pmbootstrap (non-interactive)
         run: |
           echo -e '\n\n' | pmbootstrap init || true
+
+      - name: Set up pmaports
+        run: |
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
           git remote add sm7125 https://github.com/sm7125-mainline/pmaports.git
           DEFAULT_BRANCH=$(git remote show sm7125 | awk '/HEAD branch/ {print $NF}')
           git fetch sm7125 $DEFAULT_BRANCH
           git reset --hard sm7125/$DEFAULT_BRANCH
+
+          # ВАЖНО: обновляем apk-индексы, чтобы не было ошибок несовместимости
+          pmbootstrap pull
 
       - name: Clone kernel sources
         run: |
@@ -76,4 +82,4 @@ jobs:
         with:
           name: xiaomi-joyeuse-${{ env.KERNEL_BRANCH }}
           path: out/*
-          retention-days: 200
+          retention-days: 70
