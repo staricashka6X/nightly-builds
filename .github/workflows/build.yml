@@ -1,4 +1,4 @@
-name: Build Joyeuse Plasma
+name: Build Joyeuse Plasma Mobile
 on:
   push:
   workflow_dispatch:
@@ -14,74 +14,66 @@ jobs:
       - name: Check out build configurations
         uses: actions/checkout@v4
 
-      - name: Install System Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-user-static jq git
-          sudo systemctl restart systemd-binfmt.service || true
-
       - name: Substitute placeholders in configs
         run: |
-          sed -i "s|HOME|${HOME}|g" xiaomi-joyeuse.cfg
-          sed -i "s|NPROC|$(nproc)|g" xiaomi-joyeuse.cfg
+          find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
 
       - name: Install pmbootstrap from git
         run: |
           git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          pmbootstrap --version
 
       - name: Set up pmaports
         run: |
-          mkdir -p ~/.config
-          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-
-          # Полностью неинтерактивная инициализация
-          pmbootstrap init --no-interactive
-
+          echo -e '\n\n' | pmbootstrap init || true
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          git remote add sm7125 https://github.com/staricashka6X/pmaports-sm7125.git
-          git fetch sm7125
-          git reset --hard sm7125/main
-
-          pmbootstrap index
+          git remote add sm7125 https://github.com/sm7125-mainline/pmaports.git
+          DEFAULT_BRANCH=$(git remote show sm7125 | awk '/HEAD branch/ {print $NF}')
+          git fetch sm7125 $DEFAULT_BRANCH
+          git reset --hard sm7125/$DEFAULT_BRANCH
 
       - name: Clone kernel sources
         run: |
-          git clone --depth 1 --branch $KERNEL_BRANCH https://github.com/staricashka6X/kernel_xiaomi_sm7125.git linux
+          git clone https://github.com/sm7125-mainline/linux.git \
+            --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
 
-      - name: Compile kernel
+      - name: Prepare pmbootstrap config for joyeuse
+        run: |
+          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
+
+      - name: Compile kernel with envkernel
         run: |
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
-
-          # Конфиги должны существовать в репозитории ядра
           make defconfig sm7125.config
           make -j$(nproc)
-
           pmbootstrap build --envkernel linux-postmarketos-qcom-sm7125
 
-      - name: Build Joyeuse Image
+      - name: Create artifact directory
+        run: mkdir out
+
+      - name: Build joyeuse (Tianma)
         run: |
-          mkdir out
-
-          # Tianma
-          pmbootstrap install --password 670276 --no-fpart
+          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
+          pmbootstrap install --password 147147
           pmbootstrap export
-          cp /tmp/postmarketOS-export/boot.img out/boot-tianma-joyeuse.img
-          cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-joyeuse.img
+          cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-tianma-joyeuse.img
+          cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-xiaomi-joyeuse.img
 
-          # Huaxing
-          sed -i 's/kernel = joyeuse_tianma/kernel = joyeuse_huaxing/' ~/.config/pmbootstrap_v3.cfg
+      - name: Build joyeuse (Huaxing)
+        run: |
+          sed -i 's/tianma/huaxing/g' ~/.config/pmbootstrap_v3.cfg
           pmbootstrap export
-          cp /tmp/postmarketOS-export/boot.img out/boot-huaxing-joyeuse.img
+          cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-huaxing-joyeuse.img
+          xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
+          echo -e "n\nn\ny\n" | pmbootstrap zap
 
-          xz -T0 -v out/rootfs-joyeuse.img
-
-      - name: Upload
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: joyeuse-plasma-mobile
+          name: xiaomi-joyeuse-${{ env.KERNEL_BRANCH }}
           path: out/*
+          retention-days: 200
