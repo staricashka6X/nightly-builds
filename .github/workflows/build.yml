@@ -25,11 +25,12 @@ jobs:
           sed -i "s|HOME|${HOME}|g" xiaomi-joyeuse.cfg
           sed -i "s|NPROC|$(nproc)|g" xiaomi-joyeuse.cfg
 
-      - name: Install pmbootstrap
+       - name: Install pmbootstrap from git
         run: |
-          git clone --depth=1 http://gitlab.postmarketos.org
+          git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
+          pmbootstrap --version
           
       - name: Set up pmaports
         run: |
