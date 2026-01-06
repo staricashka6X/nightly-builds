@@ -1,9 +1,7 @@
-name: Build images
+name: Build Joyeuse Plasma
 on:
   push:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * 5'
 
 env:
   KERNEL_BRANCH: 6.12.1
@@ -23,73 +21,65 @@ jobs:
 
       - name: Substitute placeholders in configs
         run: |
-          find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
+          # Заменяем HOME и NPROC в вашем xiaomi-joyeuse.cfg
+          sed -i "s|HOME|${HOME}|g" xiaomi-joyeuse.cfg
+          sed -i "s|NPROC|$(nproc)|g" xiaomi-joyeuse.cfg
 
-      - name: Install pmbootstrap from git
+      - name: Install pmbootstrap
         run: |
-          git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          git clone --depth=1 gitlab.postmarketos.org
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
-          pmbootstrap --version
-
+          
       - name: Set up pmaports
         run: |
-          echo -e '\n\n' | pmbootstrap init || true
+          # Инициализация с вашим конфигом
+          mkdir -p ~/.config
+          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
+          
+          # Инициализируем без вопросов
+          pmbootstrap init 
+          
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          git remote add sm7125 https://github.com/sm7125-mainline/pmaports.git
-          DEFAULT_BRANCH=$(git remote show sm7125 | awk '/HEAD branch/ {print $NF}')
-          git fetch sm7125 $DEFAULT_BRANCH
-          git reset --hard sm7125/$DEFAULT_BRANCH
-          # Исправляет конфликты версий (exit code 12)
+          git remote add sm7125 github.com
+          git fetch sm7125
+          git reset --hard sm7125/main
           pmbootstrap index
-
-      - name: Check kernel branch
-        run: |
-          DEFAULT_BRANCH=$(curl -s https://api.github.com/repos/sm7125-mainline/linux | jq -r '.default_branch')
-          echo "KERNEL_BRANCH=$DEFAULT_BRANCH" >> $GITHUB_ENV
 
       - name: Clone kernel sources
         run: |
-          git clone https://github.com/sm7125-mainline/linux.git --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
+          git clone github.com --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
 
-      - name: Compile kernel with envkernel
+      - name: Compile kernel
         run: |
-          # Используем joyeuse как базовый конфиг для сборки ядра
-          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
           make defconfig sm7125.config
           make -j$(nproc)
+          # Собираем пакет ядра
           pmbootstrap build --envkernel linux-postmarketos-qcom-sm7125
 
-      - name: Create artifact directory
+      - name: Build Joyeuse Image
         run: |
           mkdir out
-
-      - name: Build xiaomi-joyeuse
-        run: |
-          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-          # Предварительная сборка базы, чтобы избежать ошибок инициализации chroot
-          pmbootstrap build postmarketos-base-systemd --arch aarch64
+          # Собираем UI и систему
+          pmbootstrap install --password 147147 --no-fpart
           
-          # Сборка для tianma
-          pmbootstrap install --password 147147
+          # Экспорт для tianma
           pmbootstrap export
-          cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-tianma-joyeuse.img
-          cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-xiaomi-joyeuse.img
+          cp /tmp/postmarketOS-export/boot.img out/boot-tianma-joyeuse.img
+          cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-joyeuse.img
           
-          # Сборка для huaxing
-          sed -i 's/tianma/huaxing/g' ~/.config/pmbootstrap_v3.cfg
+          # Переключаем на huaxing и экспортируем только boot
+          sed -i 's/kernel = joyeuse_tianma/kernel = joyeuse_huaxing/' ~/.config/pmbootstrap_v3.cfg
           pmbootstrap export
-          cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-huaxing-joyeuse.img
+          cp /tmp/postmarketOS-export/boot.img out/boot-huaxing-joyeuse.img
           
-          xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
+          xz -T0 -v out/rootfs-joyeuse.img
 
-      - name: Upload artifacts
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: xiaomi-joyeuse-${{ env.KERNEL_BRANCH }}
-          path: out/*-joyeuse.img*
-          retention-days: 7
-
+          name: joyeuse-plasma-mobile
+          path: out/*
