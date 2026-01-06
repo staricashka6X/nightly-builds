@@ -27,7 +27,7 @@ jobs:
 
       - name: Install pmbootstrap
         run: |
-          git clone --depth=1 gitlab.postmarketos.org
+          git clone --depth=1 http://gitlab.postmarketos.org
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           
@@ -64,7 +64,7 @@ jobs:
         run: |
           mkdir out
           # Собираем UI и систему
-          pmbootstrap install --password 147147 --no-fpart
+          pmbootstrap install --password 670276 --no-fpart
           
           # Экспорт для tianma
           pmbootstrap export
