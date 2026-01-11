@@ -52,8 +52,7 @@ jobs:
       - name: Clone kernel sources
         run: |
           # Исправлено: добавлен полный URL к ядру
-          git clone https://github.com \
-            --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
+          git clone https://github.com/sm7125-mainline/linux.git --depth 1 ./linux
 
       - name: Compile kernel and Create APK
         run: |
