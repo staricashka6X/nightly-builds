@@ -33,7 +33,7 @@ jobs:
           mkdir -p ~/.local/var/pmbootstrap/cache_git
           
           # 2. Скачиваем официальные порты вручную, так как init v3 часто падает в CI без них
-          git clone https://gitlab.postmarketos.org/postmarketOS/pmaports/-/tree/c1b5c32f18c0b4ccb4370874926628f3fd38f51f/device/testing/device-xiaomi-miatoll.git
+          git clone https://gitlab.postmarketos.org/postmarketOS/pmaports.git
           
           # 3. Настраиваем конфиг ПРЯМО (без вызова init, который требует ввода)
           pmbootstrap config work ~/.local/var/pmbootstrap
