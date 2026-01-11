@@ -50,20 +50,15 @@ jobs:
       - name: Create artifact directory
         run: mkdir out
 
-      - name: Build joyeuse (Tianma)
+      - name: Build joyeuse rootfs (Tianma only, for U-Boot)
         run: |
           cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
           pmbootstrap install --password 670276
           pmbootstrap export
-          cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-tianma-joyeuse.img
+          # Нужен только rootfs, boot* не трогаем
           cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-xiaomi-joyeuse.img
-
-      - name: Build joyeuse (Huaxing)
-        run: |
-          sed -i 's/tianma/huaxing/g' ~/.config/pmbootstrap_v3.cfg
-          cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-huaxing-joyeuse.img
-          xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
-          echo -e "n\nn\ny\n" | pmbootstrap zap
+          # При желании можно сразу сжать:
+          # xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
