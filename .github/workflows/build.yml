@@ -28,7 +28,7 @@ jobs:
 
       - name: Initialize pmbootstrap (v3 syntax)
         run: |
-          # В 2026 году параметры задаются через config
+          # Базовая инициализация 2026 года
           pmbootstrap -y init
           pmbootstrap config work ~/.local/var/pmbootstrap
           pmbootstrap config device xiaomi-miatoll
@@ -38,10 +38,9 @@ jobs:
 
       - name: Set up custom pmaports
         run: |
-          # Сначала скачиваем официальные порты
           pmbootstrap pull
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          # Накладываем кастомные порты sm7125
+          # Исправлено: добавлен полный URL к pmaports
           git remote add sm7125 github.com
           git fetch sm7125 master
           git reset --hard sm7125/master
@@ -49,6 +48,7 @@ jobs:
 
       - name: Clone kernel sources
         run: |
+          # Исправлено: добавлен полный URL к ядру
           git clone github.com \
             --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
 
@@ -58,38 +58,40 @@ jobs:
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
           make defconfig sm7125.config
-          # Собираем локальный APK пакет ядра
+          # Собираем локальный пакет ядра и обновляем индекс
           pmbootstrap build --envkernel linux-postmarketos-qcom-sm7125
-          # Индексируем, чтобы установщик увидел локальный пакет
           pmbootstrap index
 
       - name: Create artifact directory
         run: mkdir -p out
 
+      - name: Debug and Verify Config
+        run: |
+          [ -f xiaomi-joyeuse.cfg ] && cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
+          pmbootstrap config
+          pmbootstrap deviceinfo_parse
+
       - name: Build joyeuse (Tianma)
         run: |
-          # Применяем ваш конфиг, если он существует
-          [ -f xiaomi-joyeuse.cfg ] && cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-          
-          # Флаги для минимизации конфликтов зависимостей в CI
-          pmbootstrap install --password 147147 --no-fde --no-firewall --no-check-disk-size
-          
+          # Запуск с флагом -v для логирования в реальном времени
+          pmbootstrap -v install --password 147147 --no-fde --no-firewall --no-check-disk-size
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-tianma-joyeuse.img
           cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-xiaomi-joyeuse.img
 
       - name: Build joyeuse (Huaxing)
         run: |
-          # Меняем панель в конфиге v3
           sed -i 's/tianma/huaxing/g' ~/.config/pmbootstrap_v3.cfg
-          
-          # Пересобираем только boot.img с новым конфигом
-          pmbootstrap install --password 147147 --no-fde --no-firewall --no-check-disk-size
+          pmbootstrap -v install --password 147147 --no-fde --no-firewall --no-check-disk-size
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-huaxing-joyeuse.img
-          
-          # Финальное сжатие rootfs
           xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
+
+      - name: Print logs on failure
+        if: failure()
+        run: |
+          echo "--- КРИТИЧЕСКАЯ ОШИБКА: ПОСЛЕДНИЕ СТРОКИ ЛОГА ---"
+          tail -n 200 ~/.local/var/pmbootstrap/log.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
