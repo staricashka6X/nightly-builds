@@ -18,9 +18,9 @@ jobs:
         run: |
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
 
-      - name: Install pmbootstrap 3.2.0
+      - name: Install pmbootstrap 3.6.0
         run: |
-          git clone --depth=1 --branch 3.2.0 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          git clone --depth=1 --branch 3.6.0 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           pmbootstrap --version
@@ -37,9 +37,6 @@ jobs:
           git fetch sm7125 $DEFAULT_BRANCH
           git reset --hard sm7125/$DEFAULT_BRANCH
 
-          # ВАЖНО: обновляем apk-индексы, чтобы не было ошибок несовместимости
-          pmbootstrap pull
-
       - name: Clone kernel sources
         run: |
           git clone https://github.com/sm7125-mainline/linux.git \
@@ -49,14 +46,14 @@ jobs:
         run: |
           cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
 
-      - name: Compile kernel with envkernel
+      - name: Compile kernel as package (NO envkernel)
         run: |
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
           make defconfig sm7125.config
           make -j$(nproc)
-          pmbootstrap build --envkernel linux-postmarketos-qcom-sm7125
+          pmbootstrap build linux-postmarketos-qcom-sm7125
 
       - name: Create artifact directory
         run: mkdir out
