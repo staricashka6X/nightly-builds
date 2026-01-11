@@ -18,9 +18,9 @@ jobs:
         run: |
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
 
-      - name: Install pmbootstrap 3.6.0
+      - name: Install pmbootstrap 3.8.0
         run: |
-          git clone --depth=1 --branch 3.6.0 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          git clone --depth=1 --branch 3.8.0 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           pmbootstrap --version
@@ -53,7 +53,7 @@ jobs:
       - name: Build joyeuse (Tianma)
         run: |
           cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-          pmbootstrap install --password 147147
+          pmbootstrap install --password 670276
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-tianma-joyeuse.img
           cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-xiaomi-joyeuse.img
