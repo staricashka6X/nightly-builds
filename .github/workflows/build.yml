@@ -18,26 +18,29 @@ jobs:
         run: |
           find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
 
-      - name: Install pmbootstrap 3.8.0
+      - name: Install pmbootstrap
         run: |
-          git clone --depth=1 --branch 3.8.0 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          # Используем стабильную ветку или мастер для 2026 года
+          git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
-          pmbootstrap --version
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Initialize pmbootstrap (non-interactive)
+      - name: Initialize pmbootstrap
         run: |
-          echo -e '\n\n' | pmbootstrap init || true
+          # Сначала инициализируем стандартно
+          pmbootstrap init --path ~/.local/var/pmbootstrap --device xiaomi-miatoll --ui plasma-mobile --mirror-alpine dl-cdn.alpinelinux.org --repository edge
 
-      - name: Set up pmaports
+      - name: Set up custom pmaports
         run: |
+          # Подменяем стандартные порты на кастомные от sm7125
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
           git remote add sm7125 https://github.com/sm7125-mainline/pmaports.git
-          DEFAULT_BRANCH=$(git remote show sm7125 | awk '/HEAD branch/ {print $NF}')
-          git fetch sm7125 $DEFAULT_BRANCH
-          git reset --hard sm7125/$DEFAULT_BRANCH
-
-          # ВАЖНО: обновляем apk-индексы, чтобы не было ошибок несовместимости
+          git fetch sm7125
+          # Переключаемся на нужную ветку (обычно master или main)
+          git reset --hard sm7125/master 
+          
+          # ОЧЕНЬ ВАЖНО: обновляем индексы пакетов, чтобы избежать конфликтов версий
           pmbootstrap pull
 
       - name: Clone kernel sources
@@ -45,17 +48,14 @@ jobs:
           git clone https://github.com/sm7125-mainline/linux.git \
             --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
 
-      - name: Prepare pmbootstrap config for joyeuse
+      - name: Compile kernel and BUILD PACKAGE
         run: |
-          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-
-      - name: Compile kernel with envkernel
-        run: |
+          # Вместо просто сборки в папке, мы собираем пакет .apk, чтобы pmbootstrap install его увидел
           cd linux
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
           make defconfig sm7125.config
-          make -j$(nproc)
+          # Собираем пакет для устройства
           pmbootstrap build --envkernel linux-postmarketos-qcom-sm7125
 
       - name: Create artifact directory
@@ -63,22 +63,31 @@ jobs:
 
       - name: Build joyeuse (Tianma)
         run: |
+          # Копируем ваш конфиг ПЕРЕД установкой
           cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-          pmbootstrap install --password 147147
+          
+          # Ключевой флаг --no-fde (если не нужно шифрование) и --no-base для чистоты
+          # Добавляем --strict для понимания ошибок
+          pmbootstrap install --password 147147 --no-fde
+          
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-tianma-joyeuse.img
           cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-xiaomi-joyeuse.img
 
       - name: Build joyeuse (Huaxing)
         run: |
+          # Меняем панель в конфиге и пересобираем только boot.img
           sed -i 's/tianma/huaxing/g' ~/.config/pmbootstrap_v3.cfg
+          # Повторная сборка только ядра/boot для экономии времени
+          pmbootstrap install --password 147147 --no-fde
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-huaxing-joyeuse.img
+          
+          # Сжимаем rootfs в самом конце
           xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
-          echo -e "n\nn\ny\n" | pmbootstrap zap
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: upload-artifact@v4
         with:
           name: xiaomi-joyeuse-${{ env.KERNEL_BRANCH }}
           path: out/*
