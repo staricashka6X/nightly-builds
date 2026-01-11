@@ -26,30 +26,33 @@ jobs:
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      
       - name: Initialize pmbootstrap (v3 syntax)
         run: |
-          # Базовая инициализация 2026 года
-          pmbootstrap -y init
+          # 1. Создаем необходимые директории заранее
+          mkdir -p ~/.local/var/pmbootstrap/cache_git
+          
+          # 2. Скачиваем официальные порты вручную, так как init v3 часто падает в CI без них
+          git clone --depth=1 gitlab.postmarketos.org ~/.local/var/pmbootstrap/cache_git/pmaports
+          
+          # 3. Настраиваем конфиг ПРЯМО (без вызова init, который требует ввода)
           pmbootstrap config work ~/.local/var/pmbootstrap
+          pmbootstrap config pmaports ~/.local/var/pmbootstrap/cache_git/pmaports
           pmbootstrap config device xiaomi-miatoll
           pmbootstrap config ui plasma-mobile
           pmbootstrap config channel edge
-          pmbootstrap config confirm_install_extra_packages true
-
-      - name: Set up custom pmaports
-        run: |
-          pmbootstrap pull
-          cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          # Исправлено: добавлен полный URL к pmaports
-          git remote add sm7125 github.com
-          git fetch sm7125 master
-          git reset --hard sm7125/master
-          pmbootstrap index
+          pmbootstrap config mirror_alpine dl-cdn.alpinelinux.org
+          
+          # 4. Выполняем "тихую" инициализацию для проверки ключей и создания чрутов
+          pmbootstrap -y init --skip-config
+          
+          # 5. Проверка
+          pmbootstrap config
 
       - name: Clone kernel sources
         run: |
           # Исправлено: добавлен полный URL к ядру
-          git clone github.com \
+          git clone https://github.com \
             --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
 
       - name: Compile kernel and Create APK
