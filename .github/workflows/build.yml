@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  KERNEL_BRANCH: linux-6.12.1
+  KERNEL_BRANCH: linux-6.16
 
 jobs:
   build-image:
@@ -29,15 +29,7 @@ jobs:
         run: |
           echo -e '\n\n' | pmbootstrap init || true
 
-      - name: Set up pmaports
-        run: |
-          cd ~/.local/var/pmbootstrap/cache_git/pmaports
-          git remote add sm7125 https://github.com/sm7125-mainline/pmaports.git
-          DEFAULT_BRANCH=$(git remote show sm7125 | awk '/HEAD branch/ {print $NF}')
-          git fetch sm7125 $DEFAULT_BRANCH
-          git reset --hard sm7125/$DEFAULT_BRANCH
-
-      - name: Clone kernel sources
+      - name: Clone kernel sources (linux-6.16)
         run: |
           git clone https://github.com/sm7125-mainline/linux.git \
             --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
@@ -46,7 +38,7 @@ jobs:
         run: |
           cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
 
-      - name: Compile kernel as package (NO envkernel)
+      - name: Build kernel as package (NO envkernel)
         run: |
           cd linux
           shopt -s expand_aliases
