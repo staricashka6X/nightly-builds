@@ -61,7 +61,6 @@ jobs:
       - name: Build joyeuse (Huaxing)
         run: |
           sed -i 's/tianma/huaxing/g' ~/.config/pmbootstrap_v3.cfg
-          pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-huaxing-joyeuse.img
           xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
           echo -e "n\nn\ny\n" | pmbootstrap zap
