@@ -22,28 +22,34 @@ jobs:
         run: |
           git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
+          chmod +x $PWD/pmbootstrap/pmbootstrap.py
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Initialize pmbootstrap
+      - name: Initialize pmbootstrap (v3 syntax)
         run: |
-          # Инициализация с явным указанием путей для стабильности в CI
-          pmbootstrap init --path ~/.local/var/pmbootstrap --device xiaomi-miatoll --ui plasma-mobile --repository edge --noprogress
+          # В 2026 году параметры задаются через config
+          pmbootstrap -y init
+          pmbootstrap config work ~/.local/var/pmbootstrap
+          pmbootstrap config device xiaomi-miatoll
+          pmbootstrap config ui plasma-mobile
+          pmbootstrap config channel edge
+          pmbootstrap config confirm_install_extra_packages true
 
       - name: Set up custom pmaports
         run: |
+          # Сначала скачиваем официальные порты
+          pmbootstrap pull
           cd ~/.local/var/pmbootstrap/cache_git/pmaports
+          # Накладываем кастомные порты sm7125
           git remote add sm7125 github.com
           git fetch sm7125 master
           git reset --hard sm7125/master
-          
-          # Синхронизируем индексы, чтобы apk не ругался на старые версии пакетов
-          pmbootstrap pull
           pmbootstrap index
 
       - name: Clone kernel sources
         run: |
-          git clone https://github.com \
+          git clone github.com \
             --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
 
       - name: Compile kernel and Create APK
@@ -52,9 +58,9 @@ jobs:
           shopt -s expand_aliases
           source ../pmbootstrap/helpers/envkernel.sh
           make defconfig sm7125.config
-          # Собираем локальный пакет ядра. Это важно, чтобы install не качал ядро из сети.
+          # Собираем локальный APK пакет ядра
           pmbootstrap build --envkernel linux-postmarketos-qcom-sm7125
-          # Обновляем индекс локального репозитория
+          # Индексируем, чтобы установщик увидел локальный пакет
           pmbootstrap index
 
       - name: Create artifact directory
@@ -62,11 +68,11 @@ jobs:
 
       - name: Build joyeuse (Tianma)
         run: |
-          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
+          # Применяем ваш конфиг, если он существует
+          [ -f xiaomi-joyeuse.cfg ] && cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
           
-          # --no-fde убирает зависимости шифрования, которые часто ломают сборку в CI
-          # --no-base-ui-plasma помогает избежать конфликтов с мета-пакетами
-          pmbootstrap install --password 147147 --no-fde --no-firewall
+          # Флаги для минимизации конфликтов зависимостей в CI
+          pmbootstrap install --password 147147 --no-fde --no-firewall --no-check-disk-size
           
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-tianma-joyeuse.img
@@ -74,15 +80,15 @@ jobs:
 
       - name: Build joyeuse (Huaxing)
         run: |
-          # Переключаем панель в конфиге
+          # Меняем панель в конфиге v3
           sed -i 's/tianma/huaxing/g' ~/.config/pmbootstrap_v3.cfg
           
-          # Пересобираем только ядро/bootimg для другой панели
-          pmbootstrap install --password 147147 --no-fde --no-firewall
+          # Пересобираем только boot.img с новым конфигом
+          pmbootstrap install --password 147147 --no-fde --no-firewall --no-check-disk-size
           pmbootstrap export
           cp /tmp/postmarketOS-export/boot.img out/boot-xiaomi-huaxing-joyeuse.img
           
-          # Финальное сжатие основного образа
+          # Финальное сжатие rootfs
           xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
 
       - name: Upload artifacts
