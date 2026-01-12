@@ -25,14 +25,23 @@ jobs:
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           pmbootstrap --version
 
-      - name: Initialize pmbootstrap (non-interactive, miatoll + Plasma)
+      - name: Create pmbootstrap config (non-interactive)
         run: |
-          pmbootstrap init \
-            --no-interaction \
-            --channel=edge \
-            --device=xiaomi-miatoll \
-            --ui=plasma-mobile \
-            --no-systemd
+          mkdir -p ~/.config
+          cat > ~/.config/pmbootstrap.cfg << 'EOF'
+          [pmbootstrap]
+          work = /home/runner/.local/var/pmbootstrap
+          pmaports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports
+          device = xiaomi-miatoll
+          vendor = xiaomi
+          ui = plasma-mobile
+          channel = edge
+          systemd = no
+          EOF
+
+      - name: Initialize pmbootstrap
+        run: |
+          pmbootstrap init
 
       - name: Update pmaports
         run: |
@@ -42,10 +51,6 @@ jobs:
         run: |
           git clone https://github.com/sm7125-mainline/linux.git \
             --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
-
-      - name: Prepare pmbootstrap config for joyeuse
-        run: |
-          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
 
       - name: Build kernel as package (NO envkernel)
         run: |
@@ -62,9 +67,8 @@ jobs:
       - name: Build joyeuse rootfs (Tianma only, for U-Boot)
         run: |
           cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-          pmbootstrap install --password 670276
+          pmbootstrap install --password 147147
           pmbootstrap export
-          # Нужен только rootfs
           cp /tmp/postmarketOS-export/xiaomi-miatoll-root.img out/rootfs-xiaomi-joyeuse.img
 
       - name: Upload artifacts
