@@ -25,9 +25,15 @@ jobs:
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           pmbootstrap --version
 
-      - name: Initialize pmbootstrap (non-interactive)
+      - name: Initialize pmbootstrap (non-interactive, miatoll + Plasma)
         run: |
-          echo -e '\n\n' | pmbootstrap init || true
+          pmbootstrap init \
+            --no-interaction \
+            --channel=edge \
+            --device=xiaomi-miatoll \
+            --ui=plasma-mobile \
+            --no-systemd
+
       - name: Update pmaports
         run: |
           pmbootstrap pull
