@@ -56,7 +56,7 @@ jobs:
           pmbootstrap install --password 670276
           pmbootstrap export
           # Нужен только rootfs, boot* не трогаем
-          cp /tmp/postmarketOS-export/xiaomi-miatoll.img out/rootfs-xiaomi-joyeuse.img
+          cp /tmp/postmarketOS-export/xiaomi-miatoll-root.img out/rootfs-xiaomi-joyeuse.img
           # При желании можно сразу сжать:
           # xz -T0 -9e -v out/rootfs-xiaomi-joyeuse.img
 
