@@ -28,6 +28,9 @@ jobs:
       - name: Initialize pmbootstrap (non-interactive)
         run: |
           echo -e '\n\n' | pmbootstrap init || true
+      - name: Update pmaports
+        run: |
+          pmbootstrap pull
 
       - name: Clone kernel sources (linux-6.16)
         run: |
