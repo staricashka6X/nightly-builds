@@ -1,86 +1,72 @@
-name: Build Joyeuse Plasma Mobile
+name: Build postmarketOS rootfs
+
 on:
-  push:
   workflow_dispatch:
+  push:
 
 env:
-  KERNEL_BRANCH: linux-6.16
+  DEVICE: xiaomi-miatoll
+  UI: plasma-mobile
+  CHANNEL: edge
 
 jobs:
-  build-image:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out build configurations
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Substitute placeholders in configs
+      - name: Install dependencies
         run: |
-          find . -type f -name "*.cfg" -exec sed -i "s|HOME|$(echo $HOME)|;s|NPROC|$(nproc)|" {} +
+          sudo apt update
+          sudo apt install -y git python3 qemu-user-static proot
 
-      - name: Install pmbootstrap 3.1.0
+      - name: Install pmbootstrap 3.0.0
         run: |
-          git clone --depth=1 --branch 3.1.0 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          git clone --depth=1 --branch 3.0.0 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p ~/.local/bin
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" ~/.local/bin/pmbootstrap
           pmbootstrap --version
 
       - name: Prepare pmbootstrap environment (manual init)
         run: |
-          # Создаём рабочие каталоги
           mkdir -p ~/.local/var/pmbootstrap/cache_git
           mkdir -p ~/.local/var/pmbootstrap/chroot_native
-          mkdir -p ~/.local/var/pmbootstrap/chroot_rootfs_xiaomi-miatoll
-          mkdir -p ~/.local/var/pmbootstrap/chroot_device_xiaomi-miatoll
+          mkdir -p ~/.local/var/pmbootstrap/chroot_rootfs_${DEVICE}
+          mkdir -p ~/.local/var/pmbootstrap/chroot_device_${DEVICE}
 
-          # Клонируем pmaports вручную
           git clone https://gitlab.postmarketos.org/postmarketOS/pmaports.git \
             ~/.local/var/pmbootstrap/cache_git/pmaports
 
-          # Создаём конфиг pmbootstrap
           mkdir -p ~/.config
-          cat > ~/.config/pmbootstrap.cfg << 'EOF'
+          cat > ~/.config/pmbootstrap.cfg << EOF
           [pmbootstrap]
           work = /home/runner/.local/var/pmbootstrap
           pmaports = /home/runner/.local/var/pmbootstrap/cache_git/pmaports
-          device = xiaomi-miatoll
+          device = ${DEVICE}
           vendor = xiaomi
-          ui = plasma-mobile
-          channel = edge
+          ui = ${UI}
+          channel = ${CHANNEL}
           systemd = no
           EOF
 
       - name: Update pmaports
-        run: |
-          pmbootstrap pull
+        run: pmbootstrap pull
 
-      - name: Clone kernel sources (linux-6.16)
+      - name: Build rootfs
         run: |
-          git clone https://github.com/sm7125-mainline/linux.git \
-            --single-branch --branch ${{ env.KERNEL_BRANCH }} --depth 1 ./linux
+          pmbootstrap install --password 1234
 
-      - name: Build kernel as package (NO envkernel)
+      - name: Export rootfs
         run: |
-          cd linux
-          shopt -s expand_aliases
-          source ../pmbootstrap/helpers/envkernel.sh
-          make defconfig sm7125.config
-          make -j$(nproc)
-          pmbootstrap build linux-postmarketos-qcom-sm7125
-
-      - name: Create artifact directory
-        run: mkdir out
-
-      - name: Build joyeuse rootfs (Tianma only, for U-Boot)
-        run: |
-          cp xiaomi-joyeuse.cfg ~/.config/pmbootstrap_v3.cfg
-          pmbootstrap install --password 147147
           pmbootstrap export
-          cp /tmp/postmarketOS-export/xiaomi-miatoll-root.img out/rootfs-xiaomi-joyeuse.img
+          mkdir out
+          cp /tmp/postmarketOS-export/${DEVICE}-root.img out/rootfs.img
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: xiaomi-joyeuse-${{ env.KERNEL_BRANCH }}
+          name: rootfs-${{ env.DEVICE }}
           path: out/*
-          retention-days: 70
+          retention-days: 30
